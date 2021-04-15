@@ -8,8 +8,6 @@ from pytraccar.exceptions import (
     InvalidTokenException,
     UserPermissionException
 )
-
-
 class TraccarAPI:
     """Traccar v4.2 - https://www.traccar.org/api-reference/
     Abstraction for interacting with Traccar REST API.
@@ -32,6 +30,9 @@ class TraccarAPI:
             'geofences': base_url + '/api/geofences',
             'notifications': base_url + '/api/notifications',
             'reports_events': base_url + '/api/reports/events',
+            'reports_trips': base_url + '/api/reports/trips',
+            'positions': base_url + '/api/positions',
+            'users': base_url + '/api/users',
         }
         self._session = requests.Session()
 
@@ -402,5 +403,171 @@ class TraccarAPI:
             return req.json()
         elif req.status_code == 400:
             raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
+
+    """
+    ----------------------
+    /api/reports/events
+    ----------------------
+    """
+    def get_events(self, startTime, endTime, event_type=None, deviceid=None, groupId=None):
+        """Path: /events
+        Can only be used by users to fetch events
+
+        Args:
+
+        Returns:
+            json: list of Events
+        """
+        path = self._urls['reports_events']
+        data = {
+	        'from': startTime,
+	        'to': endTime,
+	        'groupId': groupId,
+	        'type': event_type,
+        }
+        if not event_type:
+	        data['type'] = "%"
+
+        if not groupId:
+            data['groupId'] = "1"
+
+        req = self._session.get(url=path, params=data)
+
+        if req.status_code == 200:
+            return req.json()
+        if req.status_code == 400:
+            raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
+    """
+    ----------------------
+    /api/positions
+    ----------------------
+    """
+    def get_positions(self, deviceId=None, startTime=None, endTime=None, position_id=None):
+        """Path: /positions
+        Can only be used by users to fetch positions
+
+        Args:
+
+        Returns:
+            json: list of Positions
+        """
+        path = self._urls['positions']
+        data = {
+	        'deviceId': deviceId,
+	        'from': startTime,
+	        'to': endTime,
+	        'id': position_id,
+        }
+        req = self._session.get(url=path, params=data)
+
+        if req.status_code == 200:
+            return req.json()
+        if req.status_code == 400:
+            raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
+    """
+    ----------------------
+    /api/reports/trips
+    ----------------------
+    """
+    def get_trips(self, startTime, endTime, deviceid=None, groupId=None):
+        """Path: /trips
+        Can only be used by users to fetch events
+
+        Args:
+
+        Returns:
+            json: list of Report Trips
+        """
+        path = self._urls['reports_trips']
+        data = {
+	        'from': startTime,
+	        'to': endTime,
+	        'groupId': groupId,
+        }
+        if not groupId:
+            data['groupId'] = "1"
+
+        req = self._session.get(url=path, params=data)
+
+        if req.status_code == 200:
+            return req.json()
+        if req.status_code == 400:
+            raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
+
+    """
+    ----------------------
+    /api/users
+    ----------------------
+    """
+    def get_all_users(self):
+        """Path: /users
+        Can only be used by admins or managers to fetch all entities.
+
+        Args:
+
+        Returns:
+          json: All users
+        """
+        path = self._urls['users']
+        data = {'all': True}
+        req = self._session.get(url=path, params=data)
+
+        if req.status_code == 200:
+            return req.json()
+        if req.status_code == 400:
+            raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
+    """
+    ----------------------
+    /api/users
+    ----------------------
+    """
+    def create_user(self, name, email, administrator='false', token=None):
+        """Path: /users
+        Create a users. Only requires name, email.
+        Other params are optional.
+
+        https://www.traccar.org/api-reference/#/definitions/User
+
+        Args:
+          name: users name.
+          email: Device unique identifier.
+          administrator: Group identifier (Default value = 0)
+          token: Phone number (Default value = None)
+
+        Returns:
+          json: Created user.
+
+        Raises:
+          BadRequestException: If user exists in database.
+
+        """
+
+        path = self._urls['users']
+
+        data = {
+            "id": -1,  # id auto-assignment
+            "name": name,
+            "email": email,
+            "administrator": administrator,
+            "token": token,
+            "attributes":{"speedUnit":"kmh"},
+        }
+
+        req = self._session.post(url=path, json=data)
+
+        if req.status_code == 200:
+            return req.json()
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
         else:
             raise TraccarApiException(info=req.text)
