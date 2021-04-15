@@ -33,6 +33,7 @@ class TraccarAPI:
             'reports_trips': base_url + '/api/reports/trips',
             'positions': base_url + '/api/positions',
             'users': base_url + '/api/users',
+            'groups': base_url + '/api/groups',
         }
         self._session = requests.Session()
 
@@ -441,6 +442,7 @@ class TraccarAPI:
             raise UserPermissionException
         else:
             raise TraccarApiException(info=req.text)
+
     """
     ----------------------
     /api/positions
@@ -470,6 +472,7 @@ class TraccarAPI:
             raise UserPermissionException
         else:
             raise TraccarApiException(info=req.text)
+
     """
     ----------------------
     /api/reports/trips
@@ -531,7 +534,7 @@ class TraccarAPI:
     /api/users
     ----------------------
     """
-    def create_user(self, name, email, administrator='false', token=None):
+    def create_user(self, name, email, administrator=False, token=None):
         """Path: /users
         Create a users. Only requires name, email.
         Other params are optional.
@@ -571,3 +574,63 @@ class TraccarAPI:
             raise BadRequestException(message=req.text)
         else:
             raise TraccarApiException(info=req.text)
+    """
+    ----------------------
+    /api/permissions
+    ----------------------
+    """
+    def get_permissions(self, userId=None, startTime=None, endTime=None, position_id=None):
+        """Path: /permissions
+        Can only be used by users to fetch positions
+
+        Args:
+
+        Returns:
+            json: list of Permissions
+        """
+        path = self._urls['permissions']
+        data = {
+	        'deviceId': deviceId,
+	        'from': startTime,
+	        'to': endTime,
+	        'id': position_id,
+        }
+        req = self._session.get(url=path, params=data)
+
+        if req.status_code == 200:
+            return req.json()
+        if req.status_code == 400:
+            raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
+
+    """
+    ----------------------
+    /api/groups
+    ----------------------
+    """
+    def get_groups(self, userId=None):
+        """
+        Path: /groups
+        Fetch a list of groups.
+        Without any params, returns a list of the user's groups.
+
+        Args: userId
+
+        Returns:
+            json: list of Groups
+        """
+        path = self._urls['groups']
+        data = {
+	        'userId': userId,
+        }
+
+        req = self._session.get(url=path, params=data)
+
+        if req.status_code == 200:
+            return req.json()
+        if req.status_code == 400:
+            raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
+
