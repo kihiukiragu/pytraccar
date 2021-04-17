@@ -579,23 +579,21 @@ class TraccarAPI:
     /api/permissions
     ----------------------
     """
-    def get_permissions(self, userId=None, startTime=None, endTime=None, position_id=None):
+    def set_permissions(self, userId, deviceId=None):
         """Path: /permissions
         Can only be used by users to fetch positions
 
         Args:
 
         Returns:
-            json: list of Permissions
+            json: Permissions object
         """
         path = self._urls['permissions']
         data = {
+	        'userId': userId,
 	        'deviceId': deviceId,
-	        'from': startTime,
-	        'to': endTime,
-	        'id': position_id,
         }
-        req = self._session.get(url=path, params=data)
+        req = self._session.post(url=path, params=data)
 
         if req.status_code == 200:
             return req.json()
