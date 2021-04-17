@@ -34,6 +34,7 @@ class TraccarAPI:
             'positions': base_url + '/api/positions',
             'users': base_url + '/api/users',
             'groups': base_url + '/api/groups',
+            'permissions': base_url + '/api/permissions',
         }
         self._session = requests.Session()
 
@@ -581,7 +582,7 @@ class TraccarAPI:
     """
     def set_permissions(self, userId, deviceId=0, groupId=0):
         """Path: /permissions
-        Can only be used by users to fetch positions
+        Can only be used by admins to set positions
 
         Args:
 
@@ -589,23 +590,25 @@ class TraccarAPI:
             json: Permissions object
         """
         path = self._urls['permissions']
+        
         if deviceId !=0:
             data = {
-	            'userId': userId,
-	            'deviceId': deviceId,
+	            "userId": userId,
+	            "deviceId": deviceId,
             }
-        else if groupId != 0:
-            data = {
-	            'userId': userId,
-	            'groupId': groupId,
-            }
+        else:
+            if groupId != 0:
+                data = {
+	                "userId": userId,
+	                "groupId": groupId,
+                }
         
-        req = self._session.post(url=path, params=data)
+        req = self._session.post(url=path, json=data)
 
-        if req.status_code == 200:
-            return req.json()
+        if req.status_code == 204:
+            return data
         if req.status_code == 400:
-            raise UserPermissionException
+            raise BadRequestException(message=req.text)
         else:
             raise TraccarApiException(info=req.text)
 
