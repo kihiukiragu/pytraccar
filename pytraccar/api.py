@@ -579,7 +579,7 @@ class TraccarAPI:
     /api/permissions
     ----------------------
     """
-    def set_permissions(self, userId, deviceId=None):
+    def set_permissions(self, userId, deviceId=0, groupId=0):
         """Path: /permissions
         Can only be used by users to fetch positions
 
@@ -589,10 +589,17 @@ class TraccarAPI:
             json: Permissions object
         """
         path = self._urls['permissions']
-        data = {
-	        'userId': userId,
-	        'deviceId': deviceId,
-        }
+        if deviceId !=0:
+            data = {
+	            'userId': userId,
+	            'deviceId': deviceId,
+            }
+        else if groupId != 0:
+            data = {
+	            'userId': userId,
+	            'groupId': groupId,
+            }
+        
         req = self._session.post(url=path, params=data)
 
         if req.status_code == 200:
