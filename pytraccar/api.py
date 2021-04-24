@@ -1,6 +1,6 @@
 import requests
 import json
-from pytraccar.exceptions import (
+from pytraccar.pytraccar.exceptions import (
     TraccarApiException,
     BadRequestException,
     ObjectNotFoundException,
