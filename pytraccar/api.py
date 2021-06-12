@@ -30,6 +30,7 @@ class TraccarAPI:
             'geofences': base_url + '/api/geofences',
             'notifications': base_url + '/api/notifications',
             'reports_events': base_url + '/api/reports/events',
+            'reports_route': base_url + '/api/reports/route',
             'reports_trips': base_url + '/api/reports/trips',
             'positions': base_url + '/api/positions',
             'users': base_url + '/api/users',
@@ -642,3 +643,31 @@ class TraccarAPI:
         else:
             raise TraccarApiException(info=req.text)
 
+    """
+    ----------------------
+    /api/reports/route
+    ----------------------
+    """
+    def get_route(self, deviceid, startTime, endTime):
+        """Path: /route
+        Can only be used by users to fetch route
+
+        Args:
+
+        Returns:
+            json: list of positions
+        """
+        path = self._urls['reports_route']
+        data = {
+	        'from': startTime,
+	        'to': endTime,
+        }
+
+        req = self._session.get(url=path, params=data)
+
+        if req.status_code == 200:
+            return req.json()
+        if req.status_code == 400:
+            raise UserPermissionException
+        else:
+            raise TraccarApiException(info=req.text)
