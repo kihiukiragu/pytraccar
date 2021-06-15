@@ -1,3 +1,4 @@
 .idea
 .handler-saves
 .pytest_cache
+**/__pycache__/

@@ -659,6 +659,7 @@ class TraccarAPI:
         """
         path = self._urls['reports_route']
         data = {
+            'deviceId': deviceid,
 	        'from': startTime,
 	        'to': endTime,
         }
