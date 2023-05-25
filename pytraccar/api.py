@@ -498,7 +498,9 @@ class TraccarAPI:
         if not groupId:
             data['groupId'] = "1"
 
-        req = self._session.get(url=path, params=data)
+
+        headers = {'Accept': 'application/json','Content-Type': 'application/json'}
+        req = self._session.get(url=path, params=data, headers=headers)
 
         if req.status_code == 200:
             return req.json()
@@ -664,7 +666,8 @@ class TraccarAPI:
 	        'to': endTime,
         }
 
-        req = self._session.get(url=path, params=data)
+        headers = {'Accept': 'application/json','Content-Type': 'application/json'}
+        req = self._session.get(url=path, params=data, headers=headers)
 
         if req.status_code == 200:
             return req.json()
