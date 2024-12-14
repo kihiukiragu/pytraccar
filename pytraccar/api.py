@@ -164,7 +164,7 @@ class TraccarAPI:
             raise TraccarApiException(info=req.text)
 
     def create_device(self, name, unique_id, group_id=0,
-                      phone='', model='', contact='', category=None):
+                      phone='', model='', contact='', category=None, custom_attributes=None):
         """Path: /devices
         Create a device. Only requires name and unique ID.
         Other params are optional.
@@ -182,6 +182,7 @@ class TraccarAPI:
             Arrow, Default, Animal, Bicycle, Boat, Bus, Car, Crane,
             Helicopter, Motorcycle, Offroad, Person, Pickup, Plane,
             Ship, Tractor, Train, Tram, Trolleybus, Truck, Van
+          attributes: {}
 
         Returns:
           json: Created device.
@@ -202,6 +203,7 @@ class TraccarAPI:
             "contact": contact,
             "category": category,
             "groupId": group_id,
+            "attributes": custom_attributes
         }
 
         req = self._session.post(url=path, json=data)
@@ -214,7 +216,7 @@ class TraccarAPI:
             raise TraccarApiException(info=req.text)
 
     def update_device(self, device_id, name=None, unique_id=None, group_id=None,
-                      phone=None, model=None, contact=None, category=None):
+                      phone=None, model=None, contact=None, category=None, attributes=None):
 
         # Get current device values
         req = self.get_devices(query='id', params=device_id)
@@ -228,6 +230,7 @@ class TraccarAPI:
             'contact': contact,
             'category': category,
             'groupId': group_id,
+            'attributes': attributes
         }
 
         # Replaces all updated values in device_info
