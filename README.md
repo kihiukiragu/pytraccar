@@ -2,20 +2,18 @@
 
 [![Build Status][travis-image]][travis-url]
 
-
-
 ## Overview
 
 Python interface to interact with Traccar REST API.
 
 ## Installation
-Tested with Python 2.7, Python 3.4, Python 3.5, Python 3.6 and Python 3.7  
+Tested with Python 2.7, Python 3.4, Python 3.5, Python 3.6 and Python 3.7
 
-Installation from source (requires git):
+Installation from source:
 ```sh
-$ git clone https://github.com/Legacier/pytraccar.git
-$ cd pytraccar
-$ python setup.py install
+git clone git@github.com:kihiukiragu/pytraccar.git
+cd pytraccar
+pip install -e .
 ```
 
 ## Usage example
@@ -23,7 +21,7 @@ $ python setup.py install
 _For more info, please refer to the [Traccar API Reference][traccar-api-reference]._
 
 ## Development setup
-For testing purpouses, check these variables in file test_api_calls.py and set them with your traccar server values.  
+For testing purposes, check these variables in file test_api_calls.py and set them with your traccar server values.  
 
 Your Traccar's server URL (default: localhost)
 ```
@@ -49,6 +47,11 @@ admin_token = 'YOUR_TOKEN_HERE'
 Then, run pytest to start testing.
 ```sh
 $ python -m pytest
+```
+
+## Install Locally
+```commandline
+python setup.py install
 ```
 
 ## Development status

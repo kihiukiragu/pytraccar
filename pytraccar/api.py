@@ -1,6 +1,6 @@
 import requests
 import json
-from pytraccar.pytraccar.exceptions import (
+from pytraccar.exceptions import (
     TraccarApiException,
     BadRequestException,
     ObjectNotFoundException,
@@ -9,7 +9,7 @@ from pytraccar.pytraccar.exceptions import (
     UserPermissionException
 )
 class TraccarAPI:
-    """Traccar v4.2 - https://www.traccar.org/api-reference/
+    """Traccar v6.5 - https://www.traccar.org/api-reference/
     Abstraction for interacting with Traccar REST API.
 
     """
