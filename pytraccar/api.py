@@ -249,7 +249,7 @@ class TraccarAPI:
         data = {key: value if update.get(key) is None else update[key] for key, value in device_info.items()}
         headers = {'Content-Type': 'application/json'}
 
-        req = self._session.put('{}/{}'.format(self._urls['devices'], device_id),
+        req = self._session.put('{}/{}'.format(self._urls['geofences'], device_id),
                                 data=json.dumps(data), headers=headers)
 
         if req.status_code == 200:
@@ -259,8 +259,8 @@ class TraccarAPI:
         else:
             raise TraccarApiException(info=req.text)
 
-    def delete_device(self, device_id):
-        req = self._session.delete('{}/{}'.format(self._urls['devices'], device_id))
+    def delete_geofence(self, geofence_id):
+        req = self._session.delete('{}/{}'.format(self._urls['geofences'], geofence_id))
 
         if req.status_code != 204:
             raise TraccarApiException(info=req.text)
@@ -429,14 +429,16 @@ class TraccarAPI:
     /api/reports/events
     ----------------------
     """
-    def get_events(self, startTime, endTime, device_id=None, event_type=None, groupId=None):
+    def get_events(self, startTime, endTime, device_ids=None, event_type=None, groupId=None):
         """Path: /reports/events
         Can be used by users to fetch events, including specific types like 'overspeed'.
 
         Args:
             startTime: Start time (ISO 8601 UTC, e.g., '2019-08-24T14:15:22Z')
             endTime: End time (ISO 8601 UTC, e.g., '2019-08-24T14:15:22Z')
-            device_id: Single device ID (e.g., '1'). Optional. If omitted, returns events for all accessible devices.
+            device_ids: List of device IDs (e.g., ['1', '2']). Optional. If provided, will join into comma-separated string.
+                        Note: Traccar's /reports/events 'deviceId' parameter often expects a single ID,
+                        so the calling function should iterate if multiple devices are needed for 'deviceOverspeed' type.
             event_type: Specific event type (e.g., 'deviceOverspeed', 'alarm'). Optional.
             groupId: Group ID. Optional.
 
@@ -452,14 +454,15 @@ class TraccarAPI:
         }
 
         # Only add deviceId if it's explicitly provided and not None
-        if device_id is not None:
-            params['deviceId'] = str(device_id)
+        # Note: For 'deviceOverspeed' type, Traccar's API typically expects a single deviceId or groupId.
+        # We will prioritize groupId if provided, otherwise device_ids (which will be handled by the caller).
+        if groupId is not None:
+            params['groupId'] = str(groupId)
+        elif device_ids: # Fallback to device_ids if groupId is not provided
+            params['deviceId'] = ','.join(map(str, device_ids))
 
         if event_type:
             params['type'] = event_type
-
-        if groupId:
-            params['groupId'] = groupId
 
         print(f"DEBUG (pytraccar/api.py - get_events): Calling Traccar /reports/events with params: {params}")
         print(f"DEBUG (pytraccar/api.py - get_events): Target URL: {path}?{requests.compat.urlencode(params)}")
@@ -512,31 +515,55 @@ class TraccarAPI:
     ----------------------
     """
     def get_trips(self, startTime, endTime, deviceid=None, groupId=None):
-        """Path: /trips
-        Can only be used by users to fetch events
+        """Path: /reports/trips
+        Can be used by users to fetch trip reports.
 
         Args:
+            startTime: Start time (ISO 8601 UTC, e.g., '2019-08-24T14:15:22Z')
+            endTime: End time (ISO 8601 UTC, e.g., '2019-08-24T14:15:22Z')
+            deviceid: Single device ID (e.g., '1'). Optional.
+            groupId: Group ID. Optional.
 
         Returns:
             json: list of Report Trips
+
         """
         path = self._urls['reports_trips']
-        data = {
+        params = {
             'from': startTime,
             'to': endTime,
-            'groupId': groupId,
         }
-        if not groupId:
-            data['groupId'] = "1"
 
+        if deviceid is not None:
+            params['deviceId'] = str(deviceid)
+
+        if groupId is not None:
+            params['groupId'] = str(groupId)
+
+        # If neither deviceId nor groupId is provided, default to groupId 1 (or handle as per your system's default)
+        # This needs to be carefully considered based on how you want to fetch trips if no specific target is given.
+        # For this context, we will assume groupId will always be passed from ponty_reports.py
+        # if not deviceid and not groupId:
+        #     params['groupId'] = "1" # Or raise an error if a target is always expected
+
+        print(f"DEBUG (pytraccar/api.py - get_trips): Calling Traccar /reports/trips with params: {params}")
+        print(f"DEBUG (pytraccar/api.py - get_trips): Target URL: {path}?{requests.compat.urlencode(params)}")
 
         headers = {'Accept': 'application/json','Content-Type': 'application/json'}
-        req = self._session.get(url=path, params=data, headers=headers)
+        auth_tuple = (self.username, self.password) if self.username and self.password else None
+        req = self._session.get(url=path, params=params, headers=headers, auth=auth_tuple)
+
+        # --- ADDED DEBUGGING ---
+        print(f"DEBUG (pytraccar/api.py - get_trips): Response Status Code: {req.status_code}")
+        print(f"DEBUG (pytraccar/api.py - get_trips): Response Body: {req.text}")
+        # --- END ADDED DEBUGGING ---
 
         if req.status_code == 200:
             return req.json()
-        if req.status_code == 400:
-            raise UserPermissionException()
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
+        elif req.status_code == 401:
+            raise ForbiddenAccessException(message="Authentication required or failed for trips report.")
         else:
             raise TraccarApiException(info=req.text)
 
