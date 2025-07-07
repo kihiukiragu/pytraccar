@@ -1,5 +1,7 @@
 import requests
 import json
+
+# --- Import Traccar API Exceptions from your pytraccar.exceptions module ---
 from pytraccar.exceptions import (
     TraccarApiException,
     BadRequestException,
@@ -8,6 +10,8 @@ from pytraccar.exceptions import (
     InvalidTokenException,
     UserPermissionException
 )
+
+# --- YOUR CUSTOM TRACCARAPI CLASS ---
 class TraccarAPI:
     """Traccar v6.5 - https://www.traccar.org/api-reference/
     Abstraction for interacting with Traccar REST API.
@@ -24,12 +28,13 @@ class TraccarAPI:
             TraccarAPI('http://1.2.3.4')
         """
         self._token = ''
+        self.base_url = base_url # Store base_url for later use in new methods
         self._urls = {
             'devices': base_url + '/api/devices',
             'session': base_url + '/api/session',
             'geofences': base_url + '/api/geofences',
             'notifications': base_url + '/api/notifications',
-            'reports_events': base_url + '/api/reports/events',
+            'reports_events': base_url + '/api/reports/events', # Keep this for events
             'reports_route': base_url + '/api/reports/route',
             'reports_trips': base_url + '/api/reports/trips',
             'positions': base_url + '/api/positions',
@@ -38,6 +43,9 @@ class TraccarAPI:
             'permissions': base_url + '/api/permissions',
         }
         self._session = requests.Session()
+        # Storing username and password for basic auth if used
+        self.username = None
+        self.password = None
 
     @property
     def token(self):
@@ -70,9 +78,11 @@ class TraccarAPI:
         req = self._session.post(url=path, data=data)
 
         if req.status_code == 200:
+            self.username = username # Store username
+            self.password = password # Store password
             return req.json()
         elif req.status_code == 401:
-            raise ForbiddenAccessException
+            raise ForbiddenAccessException() # Instantiate the exception
         else:
             raise TraccarApiException(info=req.text)
 
@@ -88,8 +98,8 @@ class TraccarAPI:
           json: Session info
 
         Raises:
-            InvalidTokenException:
-            TraccarApiException:
+          InvalidTokenException:
+          TraccarApiException:
 
         """
         path = self._urls['session']
@@ -98,9 +108,11 @@ class TraccarAPI:
 
         if req.status_code == 200:
             self._token = token  # Save valid token.
+            # When logging in with token, username/password aren't directly available.
+            # The session will handle authentication for subsequent calls.
             return req.json()
         elif req.status_code == 404:
-            raise InvalidTokenException
+            raise InvalidTokenException() # Instantiate the exception
         else:
             raise TraccarApiException(info=req.text)
 
@@ -126,7 +138,7 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         if req.status_code == 400:
-            raise UserPermissionException
+            raise UserPermissionException() # Instantiate the exception
         else:
             raise TraccarApiException(info=req.text)
 
@@ -159,7 +171,7 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         elif req.status_code == 400:
-            raise ObjectNotFoundException(obj=params, obj_type='Device')
+            raise ObjectNotFoundException(obj=params, obj_type='Device') # Instantiate with args
         else:
             raise TraccarApiException(info=req.text)
 
@@ -211,7 +223,7 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         elif req.status_code == 400:
-            raise BadRequestException(message=req.text)
+            raise BadRequestException(message=req.text) # Instantiate with arg
         else:
             raise TraccarApiException(info=req.text)
 
@@ -276,7 +288,7 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         if req.status_code == 400:
-            raise UserPermissionException
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
 
@@ -352,7 +364,7 @@ class TraccarAPI:
             raise TraccarApiException(info=req.text)
 
     def update_geofence(self, geofence_id, name=None, area=None, description=None,
-                      calendarId=None, attributes=None):
+                        calendarId=None, attributes=None):
 
         # Get current geofence values
         req = self.get_geofences(query='id', params=geofence_id)
@@ -407,8 +419,8 @@ class TraccarAPI:
 
         if req.status_code == 200:
             return req.json()
-        elif req.status_code == 400:
-            raise UserPermissionException
+        if req.status_code == 400:
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
 
@@ -417,34 +429,50 @@ class TraccarAPI:
     /api/reports/events
     ----------------------
     """
-    def get_events(self, startTime, endTime, event_type=None, deviceid=None, groupId=None):
-        """Path: /events
-        Can only be used by users to fetch events
+    def get_events(self, startTime, endTime, device_id=None, event_type=None, groupId=None):
+        """Path: /reports/events
+        Can be used by users to fetch events, including specific types like 'overspeed'.
 
         Args:
+            startTime: Start time (ISO 8601 UTC, e.g., '2019-08-24T14:15:22Z')
+            endTime: End time (ISO 8601 UTC, e.g., '2019-08-24T14:15:22Z')
+            device_id: Single device ID (e.g., '1'). Optional. If omitted, returns events for all accessible devices.
+            event_type: Specific event type (e.g., 'deviceOverspeed', 'alarm'). Optional.
+            groupId: Group ID. Optional.
 
         Returns:
             json: list of Events
+
         """
         path = self._urls['reports_events']
-        data = {
-	        'from': startTime,
-	        'to': endTime,
-	        'groupId': groupId,
-	        'type': event_type,
+
+        params = {
+            'from': startTime,
+            'to': endTime,
         }
-        if not event_type:
-	        data['type'] = "%"
 
-        if not groupId:
-            data['groupId'] = "1"
+        # Only add deviceId if it's explicitly provided and not None
+        if device_id is not None:
+            params['deviceId'] = str(device_id)
 
-        req = self._session.get(url=path, params=data)
+        if event_type:
+            params['type'] = event_type
+
+        if groupId:
+            params['groupId'] = groupId
+
+        print(f"DEBUG (pytraccar/api.py - get_events): Calling Traccar /reports/events with params: {params}")
+        print(f"DEBUG (pytraccar/api.py - get_events): Target URL: {path}?{requests.compat.urlencode(params)}")
+
+        auth_tuple = (self.username, self.password) if self.username and self.password else None
+        req = self._session.get(url=path, params=params, auth=auth_tuple)
 
         if req.status_code == 200:
             return req.json()
-        if req.status_code == 400:
-            raise UserPermissionException
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
+        elif req.status_code == 401:
+            raise ForbiddenAccessException(message="Authentication required or failed for events report.")
         else:
             raise TraccarApiException(info=req.text)
 
@@ -464,17 +492,17 @@ class TraccarAPI:
         """
         path = self._urls['positions']
         data = {
-	        'deviceId': deviceId,
-	        'from': startTime,
-	        'to': endTime,
-	        'id': position_id,
+            'deviceId': deviceId,
+            'from': startTime,
+            'to': endTime,
+            'id': position_id,
         }
         req = self._session.get(url=path, params=data)
 
         if req.status_code == 200:
             return req.json()
         if req.status_code == 400:
-            raise UserPermissionException
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
 
@@ -494,9 +522,9 @@ class TraccarAPI:
         """
         path = self._urls['reports_trips']
         data = {
-	        'from': startTime,
-	        'to': endTime,
-	        'groupId': groupId,
+            'from': startTime,
+            'to': endTime,
+            'groupId': groupId,
         }
         if not groupId:
             data['groupId'] = "1"
@@ -508,7 +536,7 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         if req.status_code == 400:
-            raise UserPermissionException
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
 
@@ -533,7 +561,7 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         if req.status_code == 400:
-            raise UserPermissionException
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
     """
@@ -596,19 +624,19 @@ class TraccarAPI:
             json: Permissions object
         """
         path = self._urls['permissions']
-        
+
         if deviceId !=0:
             data = {
-	            "userId": userId,
-	            "deviceId": deviceId,
+                "userId": userId,
+                "deviceId": deviceId,
             }
         else:
             if groupId != 0:
                 data = {
-	                "userId": userId,
-	                "groupId": groupId,
+                    "userId": userId,
+                    "groupId": groupId,
                 }
-        
+
         req = self._session.post(url=path, json=data)
 
         if req.status_code == 204:
@@ -636,7 +664,7 @@ class TraccarAPI:
         """
         path = self._urls['groups']
         data = {
-	        'userId': userId,
+            'userId': userId,
         }
 
         req = self._session.get(url=path, params=data)
@@ -644,7 +672,7 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         if req.status_code == 400:
-            raise UserPermissionException
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
 
@@ -665,8 +693,8 @@ class TraccarAPI:
         path = self._urls['reports_route']
         data = {
             'deviceId': deviceid,
-	        'from': startTime,
-	        'to': endTime,
+            'from': startTime,
+            'to': endTime,
         }
 
         headers = {'Accept': 'application/json','Content-Type': 'application/json'}
@@ -675,6 +703,6 @@ class TraccarAPI:
         if req.status_code == 200:
             return req.json()
         if req.status_code == 400:
-            raise UserPermissionException
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
