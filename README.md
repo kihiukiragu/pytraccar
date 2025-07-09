@@ -6,6 +6,16 @@
 
 Python interface to interact with Traccar REST API.
 
+## Python Dependencies
+Starting with Debian 12.X(Bookworm), it's best to use a venv (Virtual Environment for Python due to PEP-668 issue)'
+Install Python dependencies needed for the scripts using:
+`sudo apt install python3-pip python3.11-venv`
+
+Install a Python virtual environment:
+`python3 -m venv ~/.venv`
+
+Load the venv: `source ~/.venv/bin/activate`
+
 ## Installation
 Tested with Python 2.7, Python 3.4, Python 3.5, Python 3.6 and Python 3.7
 
