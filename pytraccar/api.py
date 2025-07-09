@@ -464,9 +464,6 @@ class TraccarAPI:
         if event_type:
             params['type'] = event_type
 
-        print(f"DEBUG (pytraccar/api.py - get_events): Calling Traccar /reports/events with params: {params}")
-        print(f"DEBUG (pytraccar/api.py - get_events): Target URL: {path}?{requests.compat.urlencode(params)}")
-
         auth_tuple = (self.username, self.password) if self.username and self.password else None
         req = self._session.get(url=path, params=params, auth=auth_tuple)
 
@@ -540,23 +537,9 @@ class TraccarAPI:
         if groupId is not None:
             params['groupId'] = str(groupId)
 
-        # If neither deviceId nor groupId is provided, default to groupId 1 (or handle as per your system's default)
-        # This needs to be carefully considered based on how you want to fetch trips if no specific target is given.
-        # For this context, we will assume groupId will always be passed from ponty_reports.py
-        # if not deviceid and not groupId:
-        #     params['groupId'] = "1" # Or raise an error if a target is always expected
-
-        print(f"DEBUG (pytraccar/api.py - get_trips): Calling Traccar /reports/trips with params: {params}")
-        print(f"DEBUG (pytraccar/api.py - get_trips): Target URL: {path}?{requests.compat.urlencode(params)}")
-
         headers = {'Accept': 'application/json','Content-Type': 'application/json'}
         auth_tuple = (self.username, self.password) if self.username and self.password else None
         req = self._session.get(url=path, params=params, headers=headers, auth=auth_tuple)
-
-        # --- ADDED DEBUGGING ---
-        print(f"DEBUG (pytraccar/api.py - get_trips): Response Status Code: {req.status_code}")
-        print(f"DEBUG (pytraccar/api.py - get_trips): Response Body: {req.text}")
-        # --- END ADDED DEBUGGING ---
 
         if req.status_code == 200:
             return req.json()
@@ -709,27 +692,34 @@ class TraccarAPI:
     ----------------------
     """
     def get_route(self, deviceid, startTime, endTime):
-        """Path: /route
+        """Path: /reports/route
         Can only be used by users to fetch route
 
         Args:
+            deviceid: Device ID
+            startTime: Start time (ISO 8601 UTC)
+            endTime: End time (ISO 8601 UTC)
 
         Returns:
             json: list of positions
+
         """
         path = self._urls['reports_route']
-        data = {
+        params = {
             'deviceId': deviceid,
             'from': startTime,
             'to': endTime,
         }
 
         headers = {'Accept': 'application/json','Content-Type': 'application/json'}
-        req = self._session.get(url=path, params=data, headers=headers)
+        auth_tuple = (self.username, self.password) if self.username and self.password else None
+        req = self._session.get(url=path, params=params, headers=headers, auth=auth_tuple)
 
         if req.status_code == 200:
             return req.json()
-        if req.status_code == 400:
-            raise UserPermissionException()
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
+        elif req.status_code == 401:
+            raise ForbiddenAccessException(message="Authentication required or failed for route report.")
         else:
             raise TraccarApiException(info=req.text)
