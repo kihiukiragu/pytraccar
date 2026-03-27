@@ -249,7 +249,7 @@ class TraccarAPI:
         data = {key: value if update.get(key) is None else update[key] for key, value in device_info.items()}
         headers = {'Content-Type': 'application/json'}
 
-        req = self._session.put('{}/{}'.format(self._urls['geofences'], device_id),
+        req = self._session.put('{}/{}'.format(self._urls['devices'], device_id),
                                 data=json.dumps(data), headers=headers)
 
         if req.status_code == 200:
