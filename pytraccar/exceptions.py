@@ -38,8 +38,9 @@ class ObjectNotFoundException(TraccarApiException):
 
 class ForbiddenAccessException(TraccarApiException):
 
-    def __init__(self):
-        message = '[Access is denied]: Wrong username or password'
+    def __init__(self, message=None):
+        if message is None:
+            message = '[Access is denied]: Wrong username or password'
         super().__init__(info=message)
 
 

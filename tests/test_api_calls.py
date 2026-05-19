@@ -116,3 +116,81 @@ def test_api_users_with_admin(admin_session):
     admin = admin_session
     task1 = admin.get_all_devices()
     assert type(task1) == list
+
+
+# --- Unit tests (no server required) ---
+
+def test_forbidden_access_exception_default_message():
+    e = ForbiddenAccessException()
+    assert 'Wrong username or password' in str(e)
+
+
+def test_forbidden_access_exception_custom_message():
+    e = ForbiddenAccessException(message='Custom error')
+    assert 'Custom error' in str(e)
+
+
+def test_set_permissions_guard_raises_without_ids():
+    session = api.TraccarAPI(base_url=test_url)
+    with pytest.raises(BadRequestException):
+        session.set_permissions(userId=1)  # both deviceId and groupId default to 0
+
+
+# --- Integration tests ---
+
+def test_geofence_with_attributes(user_session):
+    user = user_session
+    task = user.create_geofence(
+        name='Attr Test Fence',
+        area="POLYGON((32 35,34 35,34 37,32 37, 32 35))",
+        description='test description',
+        attributes={'speed': 80},
+    )
+    assert type(task) == dict
+    assert task.get('description') == 'test description'
+    user.delete_geofence(geofence_id=task['id'])
+
+
+def test_commands(user_session):
+    user = user_session
+
+    # Initial list
+    result = user.get_commands()
+    assert type(result) == list
+
+    # Need a device to attach the command to
+    device = user.create_device(name='Command Test Device', unique_id='cmdtestdevice')
+    device_id = device['id']
+
+    # Available types for device
+    types = user.get_command_types(device_id=device_id)
+    assert type(types) == list
+
+    # Save a command
+    cmd = user.create_command(
+        device_id=device_id,
+        type='positionSingle',
+        description='Test command',
+    )
+    assert type(cmd) == dict
+    assert cmd['type'] == 'positionSingle'
+    command_id = cmd['id']
+
+    # Verify it appears in the list
+    commands = user.get_commands()
+    assert any(c['id'] == command_id for c in commands)
+
+    # Update the saved command
+    updated = user.update_command(command_id=command_id, description='Updated description')
+    assert type(updated) == dict
+    assert updated['description'] == 'Updated description'
+
+    # Delete the saved command
+    user.delete_command(command_id=command_id)
+
+    # Verify it is gone
+    commands_after = user.get_commands()
+    assert not any(c['id'] == command_id for c in commands_after)
+
+    # Clean up device
+    user.delete_device(device_id=device_id)

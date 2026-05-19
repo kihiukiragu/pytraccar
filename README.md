@@ -16,8 +16,19 @@ Install a Python virtual environment:
 
 Load the venv: `source ~/.venv/bin/activate`
 
+## Compatibility
+
+- **Traccar**: v6.5 – v6.13.3
+- **Python**: 3.8+
+
+## Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `requests` | >=2.21 | HTTP client |
+| `pytest` | >=4.0.2 | Testing (dev only) |
+
 ## Installation
-Tested with Python 2.7, Python 3.4, Python 3.5, Python 3.6 and Python 3.7
 
 Installation from source:
 ```sh
@@ -30,48 +41,77 @@ pip install -e .
 
 _For more info, please refer to the [Traccar API Reference][traccar-api-reference]._
 
-## Development setup
-For testing purposes, check these variables in file test_api_calls.py and set them with your traccar server values.  
-
-Your Traccar's server URL (default: localhost)
-```
-test_url = 'http://127.0.0.1:8082'
-```
-  
-Email and password from a standard user or admin. (default: admin)
+### Authentication
 
 ```python
-username, correct_password = 'admin', 'admin'
+from pytraccar.api import TraccarAPI
+
+# Token-based (recommended)
+api = TraccarAPI('https://mytraccaserver.com')
+api.login_with_token('YOUR_TOKEN')
+
+# Credentials-based
+api = TraccarAPI('https://mytraccaserver.com')
+api.login_with_credentials('admin@example.com', 'password')
 ```
-  
-Standard user token. Required for all tests with limited user permissions.
+
+### Sending a command to a device
+
+```python
+# Dispatch immediately (200) or queued if device offline (202)
+api.send_command(device_id=1, type='positionSingle')
+
+# Custom message via data channel
+api.send_command(device_id=1, type='custom', attributes={'data': 'reboot'})
+
+# Save a reusable command
+cmd = api.create_command(device_id=1, type='engineStop', description='Kill engine')
+
+# List command types supported by a device
+types = api.get_command_types(device_id=1)
 ```
-user_token = 'YOUR_TOKEN_HERE'
+
+## Development setup
+
+For testing purposes, set these variables in `tests/test_api_calls.py` to match your Traccar server:
+
+```python
+test_url = 'http://127.0.0.1:8082'          # Your Traccar server URL
+username, correct_password = 'admin', 'admin' # Credentials for a standard user or admin
+user_token  = 'YOUR_USER_TOKEN_HERE'          # Standard user token
+admin_token = 'YOUR_ADMIN_TOKEN_HERE'         # Admin user token
 ```
-  
-Admin user token. Required for all tests with admin permissions
-```
-admin_token = 'YOUR_TOKEN_HERE'
-```
-  
-Then, run pytest to start testing.
+
+Run the test suite:
 ```sh
-$ python -m pytest
+python -m pytest
 ```
+
+The unit tests (`test_forbidden_access_exception_*`, `test_set_permissions_guard_*`) run without a live server. All other tests require a running Traccar instance.
 
 ## Install Locally
-```commandline
-python setup.py install
+```sh
+pip install -e .
 ```
 
-## Development status
+## API coverage
 
-Tested
-- [x] /session 
-- [x] /users
-- [x] /devices
-- [x] /notifications
-- [x] /geofences
+| Endpoint | Operations | Status |
+|----------|-----------|--------|
+| `/session` | GET, POST | ✅ tested |
+| `/users` | GET, POST | ✅ tested |
+| `/devices` | GET, POST, PUT, DELETE | ✅ tested |
+| `/geofences` | GET, POST, PUT, DELETE | ✅ tested |
+| `/notifications` | GET | ✅ tested |
+| `/positions` | GET | ✅ |
+| `/groups` | GET | ✅ |
+| `/permissions` | POST | ✅ |
+| `/reports/events` | GET | ✅ |
+| `/reports/trips` | GET | ✅ |
+| `/reports/route` | GET | ✅ |
+| `/commands` | GET, POST, PUT, DELETE | ✅ tested |
+| `/commands/send` | POST | ✅ tested |
+| `/commands/types` | GET | ✅ tested |
 
 ## Contributing
 

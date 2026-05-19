@@ -41,6 +41,9 @@ class TraccarAPI:
             'users': base_url + '/api/users',
             'groups': base_url + '/api/groups',
             'permissions': base_url + '/api/permissions',
+            'commands': base_url + '/api/commands',
+            'commands_send': base_url + '/api/commands/send',
+            'commands_types': base_url + '/api/commands/types',
         }
         self._session = requests.Session()
         # Storing username and password for basic auth if used
@@ -137,8 +140,8 @@ class TraccarAPI:
 
         if req.status_code == 200:
             return req.json()
-        if req.status_code == 400:
-            raise UserPermissionException() # Instantiate the exception
+        elif req.status_code == 400:
+            raise UserPermissionException()
         else:
             raise TraccarApiException(info=req.text)
 
@@ -266,15 +269,23 @@ class TraccarAPI:
         else:
             raise TraccarApiException(info=req.text)
 
-    def delete_geofence(self, geofence_id):
-        req = self._session.delete('{}/{}'.format(self._urls['geofences'], geofence_id))
+    def delete_device(self, device_id):
+        """Path: /devices/{id}
+        Delete a device by ID.
 
+        Args:
+            device_id: Device identifier.
+
+        Raises:
+            TraccarApiException:
+        """
+        req = self._session.delete('{}/{}'.format(self._urls['devices'], device_id))
         if req.status_code != 204:
             raise TraccarApiException(info=req.text)
 
     """
         ----------------------
-        /api/geofences 
+        /api/geofences
         ----------------------
         """
 
@@ -355,10 +366,12 @@ class TraccarAPI:
         path = self._urls['geofences']
 
         data = {
-            "id": -1,  # id auto-assignment
+            "id": -1,
             "name": name,
             "description": description,
             "area": str(area),
+            "calendarId": calendarId or 0,
+            "attributes": attributes or {},
         }
 
         req = self._session.post(url=path, json=data)
@@ -464,9 +477,9 @@ class TraccarAPI:
         # Note: For 'deviceOverspeed' type, Traccar's API typically expects a single deviceId or groupId.
         # We will prioritize groupId if provided, otherwise device_ids (which will be handled by the caller).
         if groupId is not None:
-            params['groupId'] = str(groupId)
-        elif device_ids: # Fallback to device_ids if groupId is not provided
-            params['deviceId'] = ','.join(map(str, device_ids))
+            params['groupId'] = groupId
+        elif device_ids:
+            params['deviceId'] = device_ids
 
         if event_type:
             params['type'] = event_type
@@ -642,17 +655,12 @@ class TraccarAPI:
         """
         path = self._urls['permissions']
 
-        if deviceId !=0:
-            data = {
-                "userId": userId,
-                "deviceId": deviceId,
-            }
+        if deviceId != 0:
+            data = {"userId": userId, "deviceId": deviceId}
+        elif groupId != 0:
+            data = {"userId": userId, "groupId": groupId}
         else:
-            if groupId != 0:
-                data = {
-                    "userId": userId,
-                    "groupId": groupId,
-                }
+            raise BadRequestException(message="Either deviceId or groupId must be non-zero")
 
         req = self._session.post(url=path, json=data)
 
@@ -728,5 +736,190 @@ class TraccarAPI:
             raise BadRequestException(message=req.text)
         elif req.status_code == 401:
             raise ForbiddenAccessException(message="Authentication required or failed for route report.")
+        else:
+            raise TraccarApiException(info=req.text)
+
+    """
+    ----------------------
+    /api/commands
+    ----------------------
+    """
+    def get_commands(self, device_id=None, group_id=None, all=False):
+        """Path: /commands
+        Fetch saved commands. Without params returns commands for the current user.
+
+        Args:
+            device_id: Filter by device ID. (Default value = None)
+            group_id: Filter by group ID. (Default value = None)
+            all: Fetch all entities (admin/manager only). (Default value = False)
+
+        Returns:
+            json: List of saved commands.
+        """
+        path = self._urls['commands']
+        params = {}
+        if all:
+            params['all'] = True
+        if device_id is not None:
+            params['deviceId'] = device_id
+        if group_id is not None:
+            params['groupId'] = group_id
+
+        req = self._session.get(url=path, params=params)
+        if req.status_code == 200:
+            return req.json()
+        elif req.status_code == 400:
+            raise UserPermissionException()
+        else:
+            raise TraccarApiException(info=req.text)
+
+    def create_command(self, device_id, type, description='', text_channel=False, attributes=None):
+        """Path: /commands
+        Create a saved command.
+
+        Args:
+            device_id: Target device ID.
+            type: Command type (e.g. 'custom', 'positionSingle', 'positionPeriodic', 'engineStop').
+            description: Human-readable label. (Default value = '')
+            text_channel: Send via SMS instead of data channel. (Default value = False)
+            attributes: Command-specific attributes dict (e.g. {'data': 'msg'} for custom type).
+
+        Returns:
+            json: Created command.
+
+        Raises:
+            BadRequestException:
+        """
+        path = self._urls['commands']
+        data = {
+            "id": -1,
+            "deviceId": device_id,
+            "type": type,
+            "description": description,
+            "textChannel": text_channel,
+            "attributes": attributes or {},
+        }
+        req = self._session.post(url=path, json=data)
+        if req.status_code == 200:
+            return req.json()
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
+        else:
+            raise TraccarApiException(info=req.text)
+
+    def update_command(self, command_id, device_id=None, type=None, description=None,
+                       text_channel=None, attributes=None):
+        """Path: /commands/{id}
+        Update a saved command.
+
+        Args:
+            command_id: Command identifier.
+            device_id: Target device ID.
+            type: Command type.
+            description: Human-readable label.
+            text_channel: Send via SMS.
+            attributes: Command-specific attributes.
+
+        Returns:
+            json: Updated command.
+        """
+        req = self._session.get(url=self._urls['commands'])
+        if req.status_code != 200:
+            raise TraccarApiException(info=req.text)
+        matches = [c for c in req.json() if c.get('id') == command_id]
+        if not matches:
+            raise ObjectNotFoundException(obj=command_id, obj_type='Command')
+        command_info = matches[0]
+
+        update = {
+            'deviceId': device_id,
+            'type': type,
+            'description': description,
+            'textChannel': text_channel,
+            'attributes': attributes,
+        }
+        data = {key: value if update.get(key) is None else update[key]
+                for key, value in command_info.items()}
+
+        req = self._session.put('{}/{}'.format(self._urls['commands'], command_id), json=data)
+        if req.status_code == 200:
+            return req.json()
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
+        else:
+            raise TraccarApiException(info=req.text)
+
+    def delete_command(self, command_id):
+        """Path: /commands/{id}
+        Delete a saved command.
+
+        Args:
+            command_id: Command identifier.
+
+        Raises:
+            TraccarApiException:
+        """
+        req = self._session.delete('{}/{}'.format(self._urls['commands'], command_id))
+        if req.status_code != 204:
+            raise TraccarApiException(info=req.text)
+
+    def send_command(self, device_id, type, text_channel=False, attributes=None):
+        """Path: /commands/send
+        Dispatch a command to a device immediately, or queue it if not connected.
+
+        Args:
+            device_id: Target device ID.
+            type: Command type (e.g. 'positionSingle', 'engineStop', 'engineResume', 'custom').
+            text_channel: Send via SMS instead of data channel. (Default value = False)
+            attributes: Command-specific attributes (e.g. {'data': 'text'} for 'custom').
+
+        Returns:
+            json: Dispatched command object.
+
+        Raises:
+            BadRequestException: Device not found or command not supported.
+            ForbiddenAccessException: Insufficient permissions.
+        """
+        path = self._urls['commands_send']
+        data = {
+            "id": -1,
+            "deviceId": device_id,
+            "type": type,
+            "textChannel": text_channel,
+            "attributes": attributes or {},
+        }
+        req = self._session.post(url=path, json=data)
+        if req.status_code == 200:
+            return req.json()
+        elif req.status_code == 202:
+            return req.json()
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
+        elif req.status_code == 401:
+            raise ForbiddenAccessException()
+        else:
+            raise TraccarApiException(info=req.text)
+
+    def get_command_types(self, device_id=None):
+        """Path: /commands/types
+        Fetch the list of available command types for a device.
+        If no device_id given, returns all possible command types.
+
+        Args:
+            device_id: Device identifier. (Default value = None)
+
+        Returns:
+            json: List of command type objects.
+        """
+        path = self._urls['commands_types']
+        params = {}
+        if device_id is not None:
+            params['deviceId'] = device_id
+
+        req = self._session.get(url=path, params=params)
+        if req.status_code == 200:
+            return req.json()
+        elif req.status_code == 400:
+            raise BadRequestException(message=req.text)
         else:
             raise TraccarApiException(info=req.text)
