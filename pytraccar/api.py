@@ -228,11 +228,18 @@ class TraccarAPI:
             raise TraccarApiException(info=req.text)
 
     def update_device(self, device_id, name=None, unique_id=None, group_id=None,
-                      phone=None, model=None, contact=None, category=None, attributes=None):
+                      phone=None, model=None, contact=None, category=None, attributes=None,
+                      device_info=None):
 
-        # Get current device values
-        req = self.get_devices(query='id', params=device_id)
-        device_info = req[0]
+        if device_info is None:
+            # Traccar doesn't support id= filter combined with all=True, so fetch all and find by id
+            raw = self._session.get(self._urls['devices'], params={'all': True})
+            if raw.status_code != 200:
+                raise TraccarApiException(info=raw.text)
+            matches = [d for d in raw.json() if d.get('id') == device_id]
+            if not matches:
+                raise ObjectNotFoundException(obj=device_id, obj_type='Device')
+            device_info = matches[0]
 
         update = {
             'name': name,
